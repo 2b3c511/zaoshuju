@@ -19,7 +19,7 @@ public class Main {
     public static void main(String[] args) throws IOException {
         Map<String, Object> map = beforeStart();
         if(MapUtils.isEmpty(map)){
-            sessionPools.add(new SessionPool("172.20.31.56", 6667, "root", "root",2));
+            sessionPools.add(new SessionPool("127.0.0.1", 6667, "root", "root",2));
             execute(sessionPools);
         }else {
             String urls = String.valueOf(map.get("urls"));
