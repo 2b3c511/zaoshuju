@@ -20,12 +20,12 @@ public class Main {
     private static List<String> deviceIds = new ArrayList<>();
 
     static {
-        for (int i = 0; i < 50; i++) {
+        for (int i = 0; i < 500; i++) {
             measurement.add("s"+i);
         }
 
         deviceIds = new ArrayList<>();
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 100; i++) {
             deviceIds.add("root.sg.dev"+i);
         }
     }
@@ -83,15 +83,15 @@ public class Main {
         Random rand = new Random();
         List<List<String>> measurements = new ArrayList<>();
         List<Long> times = new ArrayList<>();
-        for (int j = 0; j < 10; j++) {
+        for (int j = 0; j < 100; j++) {
             measurements.add(measurement);
             times.add(currentTimeMillis);
         }
         List<List<String>> valuesList = new ArrayList<>();
-        for (int i = 0; i < 10 ; i++) {
+        for (int i = 0; i < 100 ; i++) {
             List<String> values = new ArrayList<>();
             valuesList.add(values);
-            for (int k = 0; k < 10; k++) {
+            for (int k = 0; k < 500; k++) {
                 values.add(String.valueOf(rand.nextFloat() % 10));
                 values.add(String.valueOf(rand.nextInt() % 2 + 3));
                 values.add(String.valueOf(rand.nextDouble() % 10));
