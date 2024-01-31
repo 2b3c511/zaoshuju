@@ -7,7 +7,6 @@ import org.apache.iotdb.tsfile.file.metadata.enums.TSDataType;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -26,7 +25,7 @@ public class Main {
             sessionPools.add(new SessionPool("127.0.0.1", 6667, "root", "root",2));
             String[] measurements = "L1_BidPrice;Type;L1_BidSize;Domain;L1_BuyNo;L1_AskPrice".split(";");
             String[] types = "int;float;double;boolean;String;long".split(";");
-            execute(sessionPools,"root.stock.Legacy.0700HK",measurements,types);
+            execute(sessionPools,1000,"root.stock.Legacy.0700HK",measurements,types,null,null,null);
         }else {
             String urls = String.valueOf(map.get("urls"));
             String[] split = urls.split(";");
@@ -39,19 +38,23 @@ public class Main {
             String[] measurements = measurement.split(";");
             String dataType = String.valueOf(map.get("dataType"));
             String[] types = dataType.split(";");
+            String boundMin = String.valueOf(map.get("boundMin"));
+            String boundMax = String.valueOf(map.get("boundMax"));
+            String isAligned = String.valueOf(map.get("isAligned"));
             for (int i = 0; i < split.length; i++) {
                 String[] url = split[i].split(":");
                 sessionPools.add(new SessionPool(url[0],Integer.valueOf(url[1]) , names[i], pwds[i],2));
             }
-            execute(sessionPools,deviceId,measurements,types);
+            long frequency = ((null != map.get("frequency")) && (Long.parseLong(String.valueOf(map.get("frequency")))>0))?Long.parseLong(String.valueOf(map.get("frequency"))):1000;
+            execute(sessionPools,frequency,deviceId,measurements,types,boundMin,boundMax,isAligned);
         }
     }
 
-    private static void execute(List<SessionPool> pools,String deviceId,String[] measurements,String[] types) {
+    private static void execute(List<SessionPool> pools,long frequency,String deviceId,String[] measurements,String[] types,String boundMin,String boundMax,String isAligned) {
         while (true) {
             try {
-                zaoshuju(pools,deviceId,measurements,types);
-                Thread.sleep(1000);
+                zaoshuju(pools,deviceId,measurements,types,boundMin,boundMax,isAligned);
+                Thread.sleep(frequency);
             } catch (Throwable e) {
                 System.out.println(e.getMessage());
                 try {
@@ -75,31 +78,71 @@ public class Main {
         map.put("urls",properties.get("urls"));
         map.put("username",properties.get("username"));
         map.put("password",properties.get("password"));
+        map.put("frequency",properties.get("frequency"));
         map.put("deviceId",properties.get("deviceId"));
         map.put("measurements",properties.get("measurements"));
         map.put("dataType",properties.get("dataType"));
+        map.put("boundMin",properties.get("boundMin"));
+        map.put("boundMax",properties.get("boundMax"));
+        map.put("isAligned",properties.get("isAligned"));
         return map;
     }
 
-    private static void zaoshuju(List<SessionPool> pools,String deviceId,String[] measurements,String[] types) throws Exception {
+    private static void zaoshuju(List<SessionPool> pools,String deviceId,String[] measurements,String[] types,String boundMin,String boundMax,String isAligned) throws Exception {
         List<Object> values = new ArrayList<>();
         List<TSDataType> typeList = new ArrayList<>();
         Random rand = new Random();
+        boolean bound = false;
+        if(null != boundMax && null != boundMin && boundMax.length()>0 && boundMin.length()>0 && "null"!= boundMax.trim()&& "null"!=boundMin.trim()){
+            bound = true;
+        }
         for (int i = 0; i < types.length; i++) {
             String type = types[i];
             switch (type.toLowerCase()){
-                case "double" :values.add(rand.nextDouble() % 10);typeList.add(TSDataType.DOUBLE);break;
-                case "int" :values.add(rand.nextInt() % 2 - 5);typeList.add(TSDataType.INT32);break;
-                case "long" :values.add(rand.nextLong());typeList.add(TSDataType.INT64);break;
-                case "float" :values.add(rand.nextFloat() % 10);typeList.add(TSDataType.FLOAT);break;
-                case "boolean" :values.add(rand.nextBoolean());typeList.add(TSDataType.BOOLEAN);break;
+                case "double" :
+                    if(bound) {
+                        values.add(Double.parseDouble(boundMin) + (Double.parseDouble(boundMax) - Double.parseDouble(boundMin)) * rand.nextDouble());
+                    }else {
+                        values.add(rand.nextDouble() % 10);
+                    }
+                    typeList.add(TSDataType.DOUBLE);
+                    break;
+                case "int" :
+                    if(bound) {
+                        values.add(Integer.valueOf(boundMin) + rand.nextInt(Integer.valueOf(boundMax) - Integer.valueOf(boundMin) + 1));
+                    }else {
+                        values.add(rand.nextInt() % 2 );
+                    }
+                    typeList.add(TSDataType.INT32);
+                    break;
+                case "long" :
+                    if(bound) {
+                        values.add(Long.parseLong(boundMin)+(Long.parseLong(boundMax) - Long.parseLong(boundMin))*rand.nextLong());
+                    }else {
+                        values.add(rand.nextLong());
+                    }
+                    typeList.add(TSDataType.INT64);break;
+                case "float" :
+                    if(bound) {
+                        values.add(Float.parseFloat(boundMin)+(Float.parseFloat(boundMax) - Float.parseFloat(boundMin))*rand.nextFloat());
+                    }else {
+                        values.add(rand.nextFloat() % 10);
+                    }
+                    typeList.add(TSDataType.FLOAT);break;
+                case "boolean" :
+                    values.add(rand.nextBoolean());typeList.add(TSDataType.BOOLEAN);break;
                 default:
                     values.add(String.valueOf(rand.nextInt()));typeList.add(TSDataType.TEXT);break;
             }
 
         }
+        boolean aligned = (null==isAligned)?false:"true".equals(isAligned.toLowerCase())?true:false;
         for (SessionPool pool : pools) {
-            pool.insertRecord(deviceId, System.currentTimeMillis(), Arrays.asList(measurements),typeList, values);
+            if (aligned) {
+                pool.insertAlignedRecord(deviceId, System.currentTimeMillis(), Arrays.asList(measurements), typeList, values);
+            } else{
+                pool.insertRecord(deviceId, System.currentTimeMillis()+11700000, Arrays.asList(measurements), typeList, values);
+            }
         }
     }
 }
